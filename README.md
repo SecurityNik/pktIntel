@@ -42,18 +42,23 @@ Currently, the script is **not** configured to send the TShark process to the ba
 
 # Commands
 ## --ip 
-Does IP threat Intelligence. 
-This is a very effective mechanism
+- Does IP threat Intelligence. 
+- This is a very effective mechanism. Focuses solely on IP field. 
+- More specifically, we look for traffic where the TCP Syn flag is set. the hope is we are looking for traffic in which the client is about to start communication.
 
 ## --domain
-Does domain name threat intelligence
-Still very effective. However, with DNS over HTTPS and DNS over TLS, this may become less effective over time.
+- Does domain name threat intelligence.
+- Still very effective. However, with DNS over HTTPS and DNS over TLS, this may become less effective over time.
+- Focuses on teh DNS query name.
+- Also focuses on TLS client Hello Handshake record, extracting the Server Name Indication value (SNI)
+
 
 ## --url
-Does URL threat intelligence against the packet data
-Most effective for HTTP traffic or decrypts HTTPS traffic.
-With the world moving to more and more encryption, this is the least effective of the 3. 
-There are ways to decrypt the traffic so all is not lost 
+- Does URL threat intelligence against the packet data
+- Most effective for HTTP traffic or decrypted HTTPS traffic.
+- With the world moving to more and more encryption, this is the least effective of the 3. 
+- There are ways to decrypt the traffic so all is not lost 
+
 
 Have Fun
 Nik Alleyne
