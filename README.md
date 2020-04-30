@@ -1,4 +1,4 @@
-#### pktIntel
+# pktIntel
 Tool used to perform threat intelligence against packet data
 
 
@@ -28,7 +28,7 @@ Currently, the script is **not** configured to send the TShark process to the ba
 
 
 **TO:**
-	sp.call(['tshark', '--interface', 'any', '-w', pcap_dir + 'securitynik.pcap', '--ring-buffer', '--files:100', '--ring-buffer', 'filesize:100000', '--color', '--print', '&'], stderr=sp.PIPE)
+	sp.call(['tshark', '--interface', 'any', '-w', pcap_dir + 'securitynik.pcap', '--ring-buffer', '--files:100', '--ring-buffer', 'filesize:100000', '--color', '--print', **'&'**], stderr=sp.PIPE)
 
 NOTE THE "&" AFTER THE "--print" argument.
 
