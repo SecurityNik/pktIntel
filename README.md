@@ -1,4 +1,4 @@
-## pktIntel
+#### pktIntel
 Tool used to perform threat intelligence against packet data
 
 
@@ -22,6 +22,7 @@ For pktintel.py tool to work effectively, you must have PCAP files available. If
 
 
 Currently, the script is **not** configured to send the TShark process to the background, if you wish to send it to the background, make the following changes:
+
 **FROM:**
 	sp.call(['tshark', '--interface', 'any', '-w', pcap_dir + 'securitynik.pcap', '--ring-buffer', '--files:100', '--ring-buffer', 'filesize:100000', '--color', '--print'], stderr=sp.PIPE)
 
