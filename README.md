@@ -37,9 +37,7 @@ Currently, the script is **not** configured to send the TShark process to the ba
 **TO:**
 	sp.call(['tshark', '--interface', 'any', '-w', pcap_dir + 'securitynik.pcap', '--ring-buffer', '--files:100', '--ring-buffer', 'filesize:100000', '--color', '--print', **'&'**], stderr=sp.PIPE)
 
-!!! NOTE 
-	
-	THE "&" AFTER THE "--print" argument sends the TShark process to the background.
+	- NOTE THE "&" AFTER THE "--print" argument sends the TShark process to the background.
 
 
 # Commands
@@ -59,3 +57,4 @@ There are ways to decrypt the traffic so all is not lost
 
 Have Fun
 Nik Alleyne
+www.securitynik.com
