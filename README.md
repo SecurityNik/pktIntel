@@ -1,10 +1,5 @@
 # pktIntel
-Tool used to perform threat intelligence against packet data
-
-
-This tool will be launched soon. Stay tuned!
-
-
+## Tool used to perform threat intelligence against packet data
 
 pktIntel.py
 
