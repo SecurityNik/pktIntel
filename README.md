@@ -1,4 +1,4 @@
-# pktIntel
+## pktIntel
 Tool used to perform threat intelligence against packet data
 
 
@@ -21,33 +21,32 @@ This file is used to check if TShark is running. If TShark is not running, this 
 For pktintel.py tool to work effectively, you must have PCAP files available. If you do not currently have any, execute this script and it will take care of that for you.
 
 
-Currently, the script is not configured to send the TShark process to the background, if you wish to send it to the background, make the following changes:
-FROM:
+Currently, the script is **not** configured to send the TShark process to the background, if you wish to send it to the background, make the following changes:
+**FROM:**
 	sp.call(['tshark', '--interface', 'any', '-w', pcap_dir + 'securitynik.pcap', '--ring-buffer', '--files:100', '--ring-buffer', 'filesize:100000', '--color', '--print'], stderr=sp.PIPE)
 
 
-TO:
+**TO:**
 	sp.call(['tshark', '--interface', 'any', '-w', pcap_dir + 'securitynik.pcap', '--ring-buffer', '--files:100', '--ring-buffer', 'filesize:100000', '--color', '--print', '&'], stderr=sp.PIPE)
 
 NOTE THE "&" AFTER THE "--print" argument.
 
 
-Commands
---ip 
+# Commands
+## --ip 
 Does IP threat Intelligence. 
 This is a very effective mechanism
 
 
---domain
+## --domain
 Does domain name threat intelligence
 Still very effective. However, with DNS over HTTPS and DNS over TLS, this may become less effective over time.
 
 
 
---url
+## --url
 Does URL threat intelligence against the packet data
 Most effective for HTTP traffic or decrypts HTTPS traffic.
 With the world moving to more and more encryption, this is the least effective of the 3. 
 There are ways to decrypt the traffic so all is not lost 
-
 
