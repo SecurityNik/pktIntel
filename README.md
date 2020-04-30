@@ -1,8 +1,6 @@
 # pktIntel
 ## Tool used to perform threat intelligence against packet data
 
-pktIntel.py
-
 	- Author: Nik Alleyne
 	- Author Blog: www.securitynik.com
 
