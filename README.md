@@ -13,7 +13,9 @@ Author: Nik Alleyne
 Author Blog: www.securitynik.com
 
 Author Books: 
+	
 	Hack and Detect - Leveraging the Cyber Kill Chain for Practical 
+	
 	Mastering TShark - Moving From Zero to Hero
 
 
