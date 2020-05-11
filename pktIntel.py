@@ -8,7 +8,6 @@ import subprocess as sp
 import os
 import platform
 import re
-import ssl
 import sys
 from signal import (signal, SIGINT)
 import time
@@ -42,10 +41,17 @@ def handler(signal_received, frame):
     sys.exit(0)
 
 
-# This function deletes output files with only one line
+'''
+This function deletes empty files and copies
+previous files to a backup directory named pkt_backup
+'''
+
 def system_clean_up():
+    # Folder to store backups
+    pkt_backup = './pkt_backup'
+
     # Read the files in the directory for all that ends with .txt extension
-    print('[-] Preparing to perform system cleanup')
+    print('[*] Preparing to perform system cleanup')
     for txt_file in os.listdir():
         if (txt_file.endswith('.txt')):
             total_lines = sum(1 for line in open(txt_file, 'r'))
@@ -57,19 +63,34 @@ def system_clean_up():
                     print('[!] Error removing files ')
                     pass
             else:
-                print('[+] Copying files to the backup folder')
+                sp.run(['mv', '--force', '--update',  txt_file, pkt_backup+'/'+txt_file])
 
-    print('[-] System deleted empty files!')
+    print('     System cleanup completed! ')
             
 
 # Perform system checks
 def system_checks():
+    # Folder to store backups
+    pkt_backup = './pkt_backup'
+
     print('[*] Checking system platform ...')
     if (platform.system() == 'Linux'):
         print('    Running on Linux. Good Start!')
     else:
         print('    WARNING! Not running on Linux. You may have to modify this code to suit your platform!')
     
+    print('[*] Looking for backup directory \'pkt_backup\' in the current folder')
+    if (os.path.exists(pkt_backup) and (os.path.isdir(pkt_backup))):
+        print('     Found backup directory')
+    else:
+        print('[+] Backup directory not found creating it.')
+        try:
+            os.mkdir(pkt_backup)
+            print('     [*] Directory successfuly created')
+        except:
+            print('     [!] Error occurred while creating backup directory.')
+            print('     [*] Please create a directory named \'pkt_backup\' in the current directory.' )
+
     print('[*] Looking for config file ...')
     if (os.path.isfile(config_file)):
         print('    Config file "{}" found!'.format(config_file))
@@ -89,16 +110,6 @@ def pkt_ini():
     
     return pkt_config
 
-
-# Disables SSL checks
-def ssl_context_setup():
-    ssl_disabled = ssl.create_default_context()
-    ssl_disabled.check_hostname = False
-    ssl_disabled.verify_mode = ssl.CERT_NONE
-
-    return ssl_disabled
-
-
 # Validate config file has all the expected sections
 def config_checks():
     print('[*] Validating configuration file ...')
@@ -107,7 +118,6 @@ def config_checks():
         print('    WARNING: Config does not seem to have the 6 sections expeected!')
         sys.exit(-1)
 
-
     # Check for default section
     if (pkt_ini().has_section('MAIN')):
         print('      Main section found!')
@@ -115,14 +125,12 @@ def config_checks():
         print('      Error default section not found!')
         sys.exit(-1)
 
-
     # Checking for IP Section
     if (pkt_ini().has_section('IP')):
         print('      IP section found!')
     else:
         print('      ERROR: IP section not found! ')
         os.exit(-1)
-
 
     # Checking for domain Section
     if (pkt_ini().has_section('DOMAIN')):
@@ -164,7 +172,7 @@ def verify_pcap_path():
     '''
     time.sleep(2)
     print('    Counting the number of files with .cap, .pcap or .pcapng extension')
-    print('      Number of PCAPs found: {}'.format(len(glob.glob(pcap_dir + '*.*[capng]', recursive=True))))
+    print('      Number of PCAPs found: {}'.format(len(glob.glob(pcap_dir + '*.*cap*', recursive=True))))
     
 
 # Download IP Threat Intelligence Information
@@ -222,19 +230,20 @@ def ip_intel_download():
     # Remove some unwanted characters
     malicious_ips = [ips.strip('\\r') for ips in malicious_ips]
     #print('[*] Here is your list of malicious IPs \n{}'.format(malicious_ips))
-    print('[*] There are currently [{}] suspicious IP to downloaded!'.format(len(malicious_ips)))
+    print('[*] There are currently \033[1;31;40m [{}] unique suspicious IPs \033[0m downloaded!'.format(len(malicious_ips)))
 
     # Run TShark against each of the PCAPS found
     print('[*] Reading PCAP files ...')
-    print('[*] Looking for TCP packets where ONLY the SYN flag is set, UDP and ICMP')
-    print('    By looking at the SYN flag, we are assuming the the 3-way handshake is about to begin')
-    print('[*] Note I may take a while so work with me on this ...')
+    print('     Looking for TCP packets where ONLY the SYN flag is set.')
+    print('     Also looking at UDP and ICMP packets')
+    print('     By looking at the SYN flag, we are assuming the the 3-way handshake has started')
     
+    print('\n[*] Note I may take a while so work with me on this ...')
     '''
         Note to reduce the noise you may instead choose to track the PUSH flag. To do so use:
         tcp.flags.push == 1"
     '''
-    for pcap_file in glob.glob(pcap_dir + '*.pcap*'):
+    for pcap_file in glob.glob(pcap_dir + '*.*cap*'):
         if ( os.access(pcap_file, os.R_OK)): 
             check_tshark_output = sp.check_output(['tshark', '-n', '-r', pcap_file, '-Y', "(((tcp.flags.syn == 1) && !(tcp.flags.ack == 1)) || (udp) || (icmp))"'', '-T', 'fields', '-e', 'ip.src', '-e', 'ip.dst'], stderr=sp.PIPE)
             check_tshark_output_ip6 = sp.check_output(['tshark', '-n', '-r', pcap_file, '-Y', "(((tcp.flags.syn == 1) && !(tcp.flags.ack == 1)) || (udp) || (icmpv6))"'', '-T', 'fields', '-e', 'ipv6.src', '-e', 'ipv6.dst'], stderr=sp.PIPE)
@@ -249,18 +258,18 @@ def ip_intel_download():
             print('    \033[1;33m;40m [*] Unable to read the file: {}'.format(pcap_file))
             print('   [*] Check the file permission. \033[1;33m;0m')
     
-    print('[*] Clearning up the TShark destination IPs, removing unwanted characters ...')
+    # print('[*] Clearning up the TShark destination IPs, removing unwanted characters ...')
     tshark_dst_ips = [ip.strip("b'") for ip in tshark_dst_ips]
     tshark_dst_ips = [ip.split('\\t') for ip in tshark_dst_ips]
     
-    print('[*] Flattening the list of lists ...')
+    #print('[*] Flattening the list of lists ...')
     tshark_dst_ips = [ips for item in tshark_dst_ips for ips in item]
 
     # Remove empty strings
     tshark_dst_ips = ' '.join(tshark_dst_ips).split()
 
     #print('[*] TShark Destination IPs with PUSH flag set \n{}'.format(tshark_dst_ips))
-    print('\n[*] Comparing downloaded IPs with those in your PCAPs ...')
+    print('[*] Comparing downloaded IPs with those in your PCAPs ...')
 
     time.sleep(2)
     suspicious_ips = set(tshark_dst_ips) & set(malicious_ips)
@@ -271,13 +280,12 @@ def ip_intel_download():
         print('  \033[1;32;40m [*] Lucky you! Nothing malicious being reported at this time! \033[1;32;0m ')
         print('   [*] Do try me again soon. I may have one or more interesting IP next time. I promise :-)')
     else:
-        print('\033[1;31;40m----- {} SUSPICIOUS IPs DETECTED --------- \n{}\033[1;31;0m \n'.format(len(suspicious_ips), suspicious_ips))
+        print('\n\033[1;31;40m----- {} SUSPICIOUS IPs DETECTED --------- \n{}\033[1;31;0m \n'.format(len(suspicious_ips), suspicious_ips))
 
-        #print('[*] Here is the session information for the IPs in question: ...')
-        print('[*] Writing IP information to \n     [{}|{}|{}]'.format(ip_threat_fp.name, ipv6_threat_session.name, ipv6_threat_session.name))
+        print('[*] Writing IP information to: \n   [./ip_threat_intel_2020-04-25T10:[{}|{}|{}]'.format(ip_threat_fp.name, ipv6_threat_session.name, ipv6_threat_session.name))
         
         # Read the pcap again, this time, matching on the particular communications and ports
-        for pcap_file in glob.glob(pcap_dir + '*.*[capng]'):
+        for pcap_file in glob.glob(pcap_dir + '*.*cap*'):
             print('[*] Reading PCAP File to extract session information: {}'.format(pcap_file))
             for ip in suspicious_ips:
                 ipv4_address = re.findall(ipv4_pattern, ip)
@@ -303,7 +311,7 @@ def ip_intel_download():
                     pass
 
     # close the file which contains the IP and session information
-    print('[*] Closing the file {}'.format(ip_threat_fp.name))
+    print('\n[*] Closing the file {}'.format(ip_threat_fp.name))
     ip_threat_fp.close()
 
     print('[*] Closing the file {}'.format(ipv4_threat_session.name))
@@ -314,7 +322,7 @@ def ip_intel_download():
 
     print('[*] Completed IP Threat Intelligence Lookup!')
 
-    print('[*] Exiting ...')
+    print('[*] Happy Hunting! ...')
     sys.exit(0)
 
 
@@ -336,7 +344,7 @@ def domain_intel_download():
     
     pcap_dir = pkt_ini()['MAIN']['pcap_dir']
     
-    print('[*] Beginning domain Threat Intelligence ...')
+    print('[*] Beginning DNS Threat Intelligence ...')
     
     for dns_url in pkt_ini().get('DOMAIN', 'blacklisted_domains').split('\n'):
         dns_request = url_request.Request(dns_url, headers=http_header, method='GET')
@@ -358,6 +366,7 @@ def domain_intel_download():
     # Flattening the list from a list of lists to a single list
     malicious_domains = [i for domain in malicious_domains for i in domain]
     
+    # Look for the DNS patten
     for domain in malicious_domains:
         dns_domain = re.findall(dns_pattern, domain)
         temp_list.append(dns_domain)
@@ -374,12 +383,12 @@ def domain_intel_download():
     print('[*] Removing Duplicates from the downloaded domains ... ')
     malicious_domains = set(malicious_domains)
     # print('Here are the malicious domains downloaded: {}'.format(malicious_domains))
-    print('[*] Currently there are {} domains reported as malicious'.format(len(malicious_domains)))
+    print('[*] There are \033[1;31;40m {} domains \033[0m reported as malicious'.format(len(malicious_domains)))
     
        
     # Run TShark against each of the PCAPS found
-    print('[*] Reading PCAP files ...')
-    print('     [*] Reading UDP|TCP destination port 53 query | http.host | tls.handshake.extensions_server_name ...')
+    print('\n[*] Reading PCAP files ...')
+    print('     Reading UDP|TCP destination port 53 query | http.host | tls.handshake.extensions_server_name ...')
     print('[*] Work with me here! This may take a while ...')
     for pcap_file in glob.glob(pcap_dir + '*.pcap*'):
         if ( os.access(pcap_file, os.R_OK)):
@@ -391,12 +400,11 @@ def domain_intel_download():
 
             check_tshark_output = sp.check_output(['tshark', '-n', '-r', pcap_file, '-Y', "((udp.dstport == 53) || (tcp.dstport == 53) && (dns.qry.type == 1)) || ((tcp.dstport == 80) && (http.request.method == 'GET') || (http.request.method == 'POST'))  || ((tcp.dstport == 443) && (tls.handshake.type == 1))"'', '-T', 'fields', '-e', 'dns.qry.name', '-e', 'http.host', '-e', 'tls.handshake.extensions_server_name'], stderr=sp.PIPE)
             
-            #print('[*] Here is the result from check_output for DNS, http.host and tls.handshake.server_name \n{}'.format(check_tshark_output))
             tshark_domains.append(check_tshark_output)
 
         else:
             print(' \033[1;33m;40m [!] Unable to read the file: {}'.format(pcap_file))
-            print('    [!] Please check the file permission. \033[1;33m;0m')
+            print('    [!] Please check the file permission. \033[0m')
     
     '''
     Tidying up the mess which was returned from reading the PCAP
@@ -407,15 +415,16 @@ def domain_intel_download():
     tshark_domains = [name for query in tshark_domains for name in query]
     #print('[*] Here are the tshark domains {}'.format(tshark_domains))
 
-    print('[*] Removing Duplicate entries from the list ...')
+    print('[*] Removing Duplicate entries from the list ... \n')
     
     # Check to see if malicious domains which were downloaded are part of the PCAPS
     suspicious_domains = set(malicious_domains) & set(tshark_domains)
     
     # Check the length of sucpicious domains to determine the response
     if (len(suspicious_domains) == 0):
-        print('  \033[1;32;40m [*] Lucky you! Nothing malicious being reported at this time! \033[1;32;0m')
-        print('   [*] Do try me again soon. I may have one or more interesting domains next time. I promise :-)')
+        print('  \033[1;32;40m [*] Lucky you! Nothing malicious being reported at this time! \033[0m')
+        print('   [*] Do try me again soon. I may have one or more interesting domains next time.') 
+        print('       I promise :-)')
     else:
         print('  \033[1;31;40m----- {} SUSPICIOUS DOMAINS DETECTED --------- \n{}\033[1;31;0m \n'.format(len(suspicious_domains), suspicious_domains))
         print('[*] Writing DNS Threat Intel information to {} files'.format(dns_threat_fp.name))
@@ -436,7 +445,7 @@ def domain_intel_download():
     
     # Call system cleanup function
 
-    print('[*] Exiting ...')
+    print('[*] Happy Hunting...')
     sys.exit(0)
 
 
@@ -499,10 +508,10 @@ def url_intel_download():
     print('[*] Removing Duplicates from the downloaded URLs ... ')
     malicious_urls = set(malicious_urls)
     # print('{}'.format(malicious_urls))
-    print('[*] Currently there are {} domains reported as malicious'.format(len(malicious_urls)))
+    print('[*] There here are \033[1;31;40m {} unique URLs \033[0m reported as malicious '.format(len(malicious_urls)))
     
     # Run TShark against each of the PCAPS found
-    print('[*] Reading PCAP files ...')
+    print('\n[*] Reading PCAP files ...')
     print('[*] Looking for URLs ...')
     print('[*] Work with me here! This may take a while ...')
     for pcap_file in glob.glob(pcap_dir + '*.pcap*'):
@@ -564,9 +573,8 @@ def url_intel_download():
     print('[*] Closing the file {}'.format(url_threat_fp.name))
     url_threat_fp.close()
     print('[*] Completed URL Threat Intelligence Lookup!')
-    print('[*] Exiting ...')
+    print('[*] Happy Hunting...')
     sys.exit(0)
-
 
 
 def main():
@@ -620,17 +628,17 @@ if __name__ == '__main__':
     print(' Author Blog: www.securitynik.com')
     print('--------------------------||' * 2)
 
-    # Check permission. I need to be run as root or with UID=0
+    # Check permission. 
     print('[*] Checking your permission ...')
     time.sleep(2)
     if ( os.getuid() != 0):
         print(' \033[1;37;40m   I don\'t need root permissions to read PCAPS ')
         print('    However, if you have PCAPs created by root or other users')
-        print('    You should instead run me with root permission \033[0m')
+        print('    You should instead run me with root permission via sudo')
 
-    print('[*] Running as {} with UID {} \n'.format(os.getlogin(), os.getuid()))
+    print('[*] Running as {} with UID {} \033[0m \n'.format(os.getlogin(), os.getuid()))
 
-    print('[*] Press CTRL+C to exit')
+    print('\033[1;33;40m [*] Press CTRL+C to exit \033[0m ')
     signal(SIGINT, handler)
     while True:
         main()
