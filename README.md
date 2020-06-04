@@ -11,7 +11,7 @@ Author Books:
 
 
 
-All configuration inforamtion found in the **pktIntel.conf** file
+All configuration information found in the **pktIntel.conf** file
 
 File: **checkTshark.py**
 
@@ -42,7 +42,7 @@ Currently, the script is **not** configured to send the TShark process to the ba
 ## --domain
 - Does domain name threat intelligence.
 - Still very effective. However, with DNS over HTTPS and DNS over TLS, this may become less effective over time.
-- Focuses on teh DNS query name.
+- Focuses on the DNS query name.
 - Also focuses on TLS client Hello Handshake record, extracting the Server Name Indication value (SNI)
 
 
