@@ -202,7 +202,7 @@ def ip_intel_download():
     print('[*] Beginning IP Threat Intelligence ...')
     for ip_url in pkt_ini().get('IP', 'ip_urls').split('\n'):
         ip_request = url_request.Request(ip_url, headers=http_header, method='GET')
-        print('    Downloading IP blacklist from: {}'.format(ip_url))
+        print('    Downloading IP blocklist from: {}'.format(ip_url))
         
         try:
         
@@ -348,7 +348,7 @@ def domain_intel_download():
     
     for dns_url in pkt_ini().get('DOMAIN', 'blacklisted_domains').split('\n'):
         dns_request = url_request.Request(dns_url, headers=http_header, method='GET')
-        print('    Downloading Domain blacklist from: {}'.format(dns_url))
+        print('    Downloading Domain blocklist from: {}'.format(dns_url))
         
         try:
             with url_request.urlopen(dns_request) as url_response:
@@ -471,7 +471,7 @@ def url_intel_download():
 
     for url in pkt_ini().get('URL', 'urls').split('\n'):
         url_intel_request = url_request.Request(url, headers=http_header, method='GET')
-        print('    Downloading URL blacklist from: {}'.format(url))
+        print('    Downloading URL blocklist from: {}'.format(url))
         
         try:
             with url_request.urlopen(url) as url_response:
