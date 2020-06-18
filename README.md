@@ -7,7 +7,7 @@
 Author Books: 
 
 	- Hack and Detect - Leveraging the Cyber Kill Chain for Practical 
-	- Mastering TShark - Moving From Zero to Hero
+	- Mastering TShark Network Forensics - Moving From Zero to Hero
 
 
 
