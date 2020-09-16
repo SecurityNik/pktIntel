@@ -183,14 +183,14 @@ def ip_intel_download():
     suspicious_ips = []
     malicious_ips = []
     ipv4_pattern = re.compile(r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}')
-    ip_threat_fp = open('./ip_threat_intel_'+time.strftime('%Y-%m-%dT%H:%M:%S')+'.txt', 'a')
+    ip_threat_fp = open('./ip_threat_intel_'+time.strftime('%Y-%m-%dT%H-%M-%S')+'.txt', 'a')
     ip_threat_fp.write('IP Address              PCAP File \n')
-    ipv4_threat_session = open('./IPv4_session_'+time.strftime('%Y-%m-%dT%H:%M:%S')+'.txt', 'a')
+    ipv4_threat_session = open('./IPv4_session_'+time.strftime('%Y-%m-%dT%H-%M-%S')+'.txt', 'a')
     ipv4_threat_session.write('frame.number \t\t frame.time \t\t ip.src   tcp.srcport    ip.dst   tcp.dstport   frame.len  ip.len \n')
     # Because subprocess will write above the previous line, I need to perform a flush
     ipv4_threat_session.flush()
 
-    ipv6_threat_session = open('./IPv6_session_'+time.strftime('%Y-%m-%dT%H:%M:%S')+'.txt', 'a') 
+    ipv6_threat_session = open('./IPv6_session_'+time.strftime('%Y-%m-%dT%H-%M-%S')+'.txt', 'a') 
     ipv6_threat_session.write('frame.number        frame.time          ipv6.src          tcp.srcport         ipv6.dst      tcp.dstport   frame.len    ip6.plen \n')
     ipv6_threat_session.flush()
     
@@ -333,7 +333,7 @@ def domain_intel_download():
     tshark_domains = []
     suspicious_domains = []
     malicious_domains = []
-    dns_threat_fp = open('./dns_threat_intel_'+time.strftime('%Y-%m-%dT%H:%M:%S')+'.txt', 'a')
+    dns_threat_fp = open('./dns_threat_intel_'+time.strftime('%Y-%m-%dT%H-%M-%S')+'.txt', 'a')
     dns_threat_fp.write('frame.number	frame.time	ip.src   srcport    ip.dst   dstport	dns.id   frame.len	ip.len	Name Information ')
     
     # Because subprocess will write above the previous line, I need to perform a flush
@@ -456,7 +456,7 @@ def url_intel_download():
     tshark_urls = []
     suspicious_urls = []
     malicious_urls = []
-    url_threat_fp = open('./url_threat_intel_'+time.strftime('%Y-%m-%dT%H:%M:%S')+'.txt', 'a')
+    url_threat_fp = open('./url_threat_intel_'+time.strftime('%Y-%m-%dT%H-%M-%S')+'.txt', 'a')
     url_threat_fp.write('frame.number	frame.time	ip.src	tcp.srcport  ip.dst	  tcp.dstport   http.request.full_uri        ip.len     tcp.len       \n')
     
     # Because subprocess will write above the previous line, I need to perform a flush
