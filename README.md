@@ -53,6 +53,13 @@ Currently, the script is **not** configured to send the TShark process to the ba
 - There are ways to decrypt the traffic so all is not lost 
 
 
+Here is the YouTube link to a video showing how the tool is used:
+
+
+[![Video Showing How To Use The Tool](https://img.youtube.com/vi/ikhKUylOJCw/0.jpg)](https://www.youtube.com/watch?v=ikhKUylOJCw)
+
+https://www.youtube.com/watch?v=ikhKUylOJCw
+
 Have Fun
 <br>Nik Alleyne</br>
 www.securitynik.com
