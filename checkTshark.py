@@ -149,20 +149,7 @@ def main():
     
     verify_capture_tool_installed()
     start_capturing()
-
-#    print('[*] Checking if TShark is running ... ')
-#    tshark_process_running = sp.Popen('ps aux | grep tshark --only-matching', shell=True, stdout=sp.PIPE)
-#    tshark_process_running = tshark_process_running.stdout.read().decode('utf-8').split('\n')
     
-#    time.sleep(2)
-#    if (len(tshark_process_running) > 3):
-#        print('[*] Looks like TShark may be running already ')
-#    else:
-#        start_ts = input('[*] TShark is currently not running, start TShark?-  YES/NO: ').upper()
-#        if (start_ts == 'YES'):
-#            start_tshark()
-#        else:
-#            print('[*] Exiting ... ')
     sys.exit(0)
 
         
