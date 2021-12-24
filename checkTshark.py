@@ -79,13 +79,13 @@ def tshark():
     print('\033[1;31;40m [*] Press CTRL+C to exit \033[1;31;0m')
     print(f'[*] Capturing with tshark ...')
     while True:
-        sp.call(['tshark', '--interface', 'any', '-w', pcap_dir + 'securitynik.pcap', '--ring-buffer', '--files:100', '--ring-buffer', 'filesize:100000', '--color', '--print'])
+        sp.call(['tshark', '-n', '--interface', 'any', '-w', pcap_dir + 'securitynik.pcap', '--ring-buffer', '--files:100', '--ring-buffer', 'filesize:100000', '--color', '--print'])
 
 def tcpdump():
     print('\033[1;31;40m [*] Press CTRL+C to exit \033[1;31;0m')
     print(f'[*] Capturing with tcpdump ... ...')
     while True:
-        sp.call(['tcpdump', '--interface', 'any', '-w', pcap_dir + 'securitynik.pcap', '-vv', '--print', '--number', '-C', '100', '-W', '100'])
+        sp.call(['tcpdump', '-n', '--interface', 'any', '-w', pcap_dir + 'securitynik.pcap', '-vv', '--print', '--number', '-C', '100', '-W', '100'])
 
 def dumpcap():
     print('\033[1;31;40m [*] Press CTRL+C to exit \033[1;31;0m')
