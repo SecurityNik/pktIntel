@@ -41,6 +41,22 @@ def handler(signal_received, frame):
     sys.exit(0)
 
 
+def check_tshark_installed():
+    print('*' * 50)
+    print('[*] TShark is needed for the analysis. Verifying it is installed  ... ')
+    print('*' * 50)
+
+    time.sleep(1)
+
+    check_tshark = sp.run(['which', 'tshark'], stdout=sp.PIPE)
+    if ( check_tshark.returncode == 0):
+        print('   \\->> TShark found ...')
+    
+    else:
+        print('\033[1;33;40m \\->> [!] Tshark NOT FOUND! Please install TShark and rerun this script \033[0m ')
+        sys.exit(-1)
+    
+
 '''
 This function deletes empty files and copies
 previous files to a backup directory named pkt_backup
@@ -277,8 +293,9 @@ def ip_intel_download():
     # Remove those entries from the list that are empty
     suspicious_ips = ' '.join(suspicious_ips).split()
     if (len(suspicious_ips) == 0):
-        print('  \033[1;32;40m [*] Lucky you! Nothing malicious being reported at this time! \033[1;32;0m ')
-        print('   [*] Do try me again soon. I may have one or more interesting IP next time. I promise :-)')
+        print('  \033[0;32;40m [*] Lucky you! Nothing malicious being reported at this time!')
+        print('   [*] Do try me again soon. I may have one or more interesting IPs next time.') 
+        print('       I promise :-) \033[0m')
     else:
         print('\n\033[1;31;40m----- {} SUSPICIOUS IPs DETECTED --------- \n{}\033[1;31;0m \n'.format(len(suspicious_ips), suspicious_ips))
 
@@ -422,9 +439,9 @@ def domain_intel_download():
     
     # Check the length of sucpicious domains to determine the response
     if (len(suspicious_domains) == 0):
-        print('  \033[1;32;40m [*] Lucky you! Nothing malicious being reported at this time! \033[0m')
-        print('   [*] Do try me again soon. I may have one or more interesting domains next time.') 
-        print('       I promise :-)')
+        print('  \033[0;32;40m [*] Lucky you! Nothing malicious being reported at this time!')
+        print('   [*] Do try me again soon. I may have one or more interesting Domains next time.') 
+        print('       I promise :-) \033[0m')
     else:
         print('  \033[1;31;40m----- {} SUSPICIOUS DOMAINS DETECTED --------- \n{}\033[1;31;0m \n'.format(len(suspicious_domains), suspicious_domains))
         print('[*] Writing DNS Threat Intel information to {} files'.format(dns_threat_fp.name))
@@ -601,6 +618,7 @@ def main():
     verify_pcap_path()
     system_clean_up()
     
+    
     # Check if the argument entered is IP
     if (argument_parser.ip):
         ip_intel_download()
@@ -637,6 +655,8 @@ if __name__ == '__main__':
         print('    You should instead run me with root permission via sudo')
 
     print('[*] Running as {} with UID {} \033[0m \n'.format(os.getlogin(), os.getuid()))
+
+    check_tshark_installed()
 
     print('\033[1;33;40m [*] Press CTRL+C to exit \033[0m ')
     signal(SIGINT, handler)
