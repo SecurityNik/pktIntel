@@ -25,7 +25,6 @@ from signal import (signal, SIGINT)
 # Configuration file path
 config_file = './pktIntel.conf'
 
-
 # Catch CTRL+C
 def handler(signal_received, frame):
     print('[*] CTRL+C detected Exiting Gracefully.')
@@ -41,6 +40,7 @@ def pkt_ini():
 # Verify capture tool installed
 def verify_capture_tool_installed():
     capture_tool = 0
+    global capture_tool_info
     capture_tool_info = {'tshark':[False, ""], 'tcpdump':[False, ""], 'dumpcap':[False, ""]}
     global tool_choice
 
@@ -106,19 +106,18 @@ def start_capturing():
     perform continuous capture for files up to size 100M (100,000 Kb)
     Once the file gets to 100M rotate to a new pcap
     '''
+    print('[*] PCAPs are being written to {} folder!'.format(pcap_dir))
     
-    if (tool_choice == 1):
+    if ( ( tool_choice == 1 ) and ( capture_tool_info['tshark'][0] == True ) and ( capture_tool_info['tshark'][1] != "" ) ):
         tshark()
-    elif (tool_choice == 2):
+    elif ( ( tool_choice == 2 ) and ( capture_tool_info['tcpdump'][0] == True ) and ( capture_tool_info['tcpdump'][1] != "" ) ):
         tcpdump()
-    elif (tool_choice == 3):
+    elif ( ( tool_choice == 3 ) and ( capture_tool_info['dumpcap'][0] == True ) and ( capture_tool_info['dumpcap'][1] != "" ) ):
         dumpcap()
     
     else:
         print(f"\n[ERROR !] Sorry { tool_choice } is an invalid choice ")
         return
-
-    print('[*] PCAPs are being written to {} folder!'.format(pcap_dir))
 
 
 def main():
