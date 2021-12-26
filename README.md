@@ -15,7 +15,7 @@ All configuration information found in the **pktIntel.conf** file
 
 File: **capture.py**
 
-- This script is used to check if TShark is running. If TShark is not running, this script can be used to setup continuous monitoring for packets. 
+- This script is used to check if TShark, tcpdump or dumpcap is installed. This script can be used to setup continuous monitoring for packets. 
 - This script has been updated as of December 24, 2021 to now accommodate other capturing tools.
 ---------------------------------------------------
 Found the following capturing tools
@@ -32,7 +32,7 @@ Please select a number for a capturing tool
 
 File: **pktintel.py** 
 
-- To work effectively, you must have PCAP files available. If you do not currently have any, execute **checkTshark.py** and it will take care of that for you.
+- To work effectively, you must have PCAP files available and TShark installed. If you do not currently have any pcaps, execute **capture.py** and it will take care of that for you.
 
 Currently, the script is **not** configured to send the TShark process to the background, if you wish to send it to the background, make the following changes:
 
