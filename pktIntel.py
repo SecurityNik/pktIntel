@@ -198,6 +198,7 @@ def ip_intel_download():
     tshark_dst_ips = []
     suspicious_ips = []
     malicious_ips = []
+    malicious_ips_file = 'malicious_ips.csv'
     ipv4_pattern = re.compile(r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}')
     ip_threat_fp = open('./ip_threat_intel_'+time.strftime('%Y-%m-%dT%H-%M-%S')+'.txt', 'a')
     ip_threat_fp.write('IP Address              PCAP File \n')
@@ -247,6 +248,13 @@ def ip_intel_download():
     malicious_ips = [ips.strip('\\r') for ips in malicious_ips]
     #print('[*] Here is your list of malicious IPs \n{}'.format(malicious_ips))
     print('[*] There are currently \033[1;31;40m [{}] unique suspicious IPs \033[0m downloaded!'.format(len(malicious_ips)))
+
+    print(f'[*] Writing all malicious IPs to {malicious_ips_file} file ')
+    tmp_ips = re.findall(pattern=r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}', string= f'{malicious_ips}\n')
+    with open(file=malicious_ips_file, mode='w') as malicious_ips_fp:
+        malicious_ips_fp.write('IP Address \n')
+        for ip in tmp_ips:
+            malicious_ips_fp.write(ip+'\n')    
 
     # Run TShark against each of the PCAPS found
     print('[*] Reading PCAP files ...')
