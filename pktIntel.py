@@ -252,7 +252,7 @@ def ip_intel_download():
     print(f'[*] Writing all malicious IPs to {malicious_ips_file} file ')
     tmp_ips = re.findall(pattern=r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}', string= f'{malicious_ips}\n')
     with open(file=malicious_ips_file, mode='w') as malicious_ips_fp:
-        malicious_ips_fp.write('IP Address \n')
+        malicious_ips_fp.write('IPv4_Addresses\n')
         for ip in tmp_ips:
             malicious_ips_fp.write(ip+'\n')    
 
