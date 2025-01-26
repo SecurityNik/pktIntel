@@ -662,7 +662,7 @@ if __name__ == '__main__':
         print('    However, if you have PCAPs created by root or other users')
         print('    You should instead run me with root permission via sudo')
 
-    print('[*] Running as {} with UID {} \033[0m \n'.format(os.getlogin(), os.getuid()))
+    print(f'[*] Running as {os.environ['USER']} with UID {os.getuid()} \033[0m \n')
 
     check_tshark_installed()
 
