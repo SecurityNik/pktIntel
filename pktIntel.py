@@ -6,6 +6,7 @@ import glob
 import ipaddress
 import subprocess as sp
 import os
+import pwd
 import platform
 import re
 import sys
@@ -13,6 +14,9 @@ from signal import (signal, SIGINT)
 import time
 from urllib import request as url_request
 from urllib.error import HTTPError, URLError
+import random
+import socket
+from pathlib import Path
 
 '''
 Author: Nik Alleyne
@@ -23,7 +27,7 @@ File: pktIntel.py
 
 __author__ = 'Nik Alleyne - www.securitynik.com'
 __contact__ = 'nikalleyne at gmail dot com'
-__version__ = '1.0'
+__version__ = '1.1'
 __status__ = 'Development'
 __date__ = '2020-04-20'
 
@@ -179,20 +183,22 @@ def config_checks():
 # Verify the path of the PCAP directory
 def verify_pcap_path():
     print('[*] Verifying PCAP directory exists in MAIN section...')
-    pcap_dir = pkt_ini()['MAIN']['pcap_dir']
+    pcap_dir = Path(pkt_ini()['MAIN']['pcap_dir'])
     print('    PCAP directory reported as "{}"'.format(pcap_dir))
-
+    pcap_files = list(pcap_dir.glob('*.*cap*'))
+        
     ''' 
     Count the number of PCAP files reported. 
     These files MUST have a .cap, .pcap or .pcapng extension
     '''
     time.sleep(2)
     print('    Counting the number of files with .cap, .pcap or .pcapng extension')
-    print('      Number of PCAPs found: {}'.format(len(glob.glob(pcap_dir + '*.*cap*', recursive=True))))
+    print(f'      Number of PCAPs found: {len(pcap_files)}')
     
 
 # Download IP Threat Intelligence Information
-def ip_intel_download():
+def ip_intel_download(pcap_dir):
+    pcap_dir = Path(pcap_dir)
     time.sleep(2)
     #ip_list = []
     tshark_dst_ips = []
@@ -214,7 +220,7 @@ def ip_intel_download():
     # Regex pattern for IPv6 borrowed :-) from https://www.regextester.com/25
     ipv6_pattern = re.compile(r'(([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,}|::(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9]))')
 
-    pcap_dir = pkt_ini()['MAIN']['pcap_dir']
+    # pcap_dir = pkt_ini()['MAIN']['pcap_dir']
     
     print('[*] Beginning IP Threat Intelligence ...')
     for ip_url in pkt_ini().get('IP', 'ip_urls').split('\n'):
@@ -223,14 +229,15 @@ def ip_intel_download():
         
         try:
         
-            with url_request.urlopen(ip_request) as url_response:
+            with url_request.urlopen(ip_request, timeout=10) as url_response:
                 blacklisted_ips = list(str(url_response.read()).split('\\n'))
                 malicious_ips.append(blacklisted_ips)
-        except HTTPError as e:
-            pass
+        # except HTTPError as e:
+        #     pass
  
-        except (HTTPError, URLError) as e:
-            print('     Looks like an issues was encountered. \n       {}'.format(e.reason))
+        except (HTTPError, URLError, TimeoutError) as e:
+            print('     [!] Looks like an issues was encountered')
+            continue
         
         else:
             print('     Successfully downloaded IP Threat Intelligence')
@@ -239,7 +246,6 @@ def ip_intel_download():
     # Since the data came in as list of list, flatten to a single list
     malicious_ips = [ips for item in malicious_ips for ips in item]
 
-    
     # Remove duplicates from the list
     print('[*] Removing duplicates from the downloaded IPs ...')
     malicious_ips = list(set(malicious_ips))
@@ -267,30 +273,73 @@ def ip_intel_download():
         Note to reduce the noise you may instead choose to track the PUSH flag. To do so use:
         tcp.flags.push == 1"
     '''
-    for pcap_file in glob.glob(pcap_dir + '*.*cap*'):
-        if ( os.access(pcap_file, os.R_OK)): 
-            check_tshark_output = sp.check_output(['tshark', '-n', '-r', pcap_file, '-Y', "(((tcp.flags.syn == 1) && !(tcp.flags.ack == 1)) || (udp) || (icmp))"'', '-T', 'fields', '-e', 'ip.src', '-e', 'ip.dst'], stderr=sp.PIPE)
-            check_tshark_output_ip6 = sp.check_output(['tshark', '-n', '-r', pcap_file, '-Y', "(((tcp.flags.syn == 1) && !(tcp.flags.ack == 1)) || (udp) || (icmpv6))"'', '-T', 'fields', '-e', 'ipv6.src', '-e', 'ipv6.dst'], stderr=sp.PIPE)
-            # For each destination IPv4, append it to the list
-            for dst_ip in str(check_tshark_output).split('\\n'):
-                tshark_dst_ips.append(dst_ip)
+    for pcap_path in pcap_dir.glob('*.*cap*'):
+        if not os.access(pcap_path, os.R_OK): 
+            print(f'    [!] Unable to read PCAP: {pcap_path}')
+            print(f'    [!] Check file permission')
+            continue 
 
+        # Get the pcap file if no file read error
+        pcap_file = str(pcap_path)
+
+        check_tshark_result = sp.run([
+            'tshark', 
+            '-n', 
+            '-r', pcap_file, 
+            '-Y', "(((tcp.flags.syn == 1) && !(tcp.flags.ack == 1)) || (udp) || (icmp))"'', '-T', 'fields', '-e', 'ip.src', '-e', 'ip.dst'],
+            capture_output=True,
+            text=True
+            )
+
+        if check_tshark_result.returncode != 0:
+            print(f'    [!] Unable to read PCAP: {pcap_file}')
+            print(f'    [!] TShark error: {check_tshark_result.stderr.strip()}')
+            continue 
+
+        #check_tshark_output = tshark_result.stdout()
+
+        # For each destination IPv4, append it to the list
+        for dst_ip in check_tshark_result.stdout.split():
+            tshark_dst_ips.extend(dst_ip.split('\t'))
+
+            
+        check_tshark_result_ip6 = sp.run([
+            'tshark', 
+            '-n', 
+            '-r', pcap_file, 
+            '-Y', "(((tcp.flags.syn == 1) && !(tcp.flags.ack == 1)) || (udp) || (icmpv6))"'', '-T', 'fields', '-e', 'ipv6.src', '-e', 'ipv6.dst'], 
+            capture_output=True,
+            text=True
+            )
+
+        if check_tshark_result_ip6.returncode != 0:
+            print(f'    [!] Unable to read IPv6 data from: {pcap_file}')
+            print(f'    [!] TShark error: {check_tshark_result_ip6.stderr.strip()}')
+            continue 
+
+        
+            
         # For each destination IPv6, append it to the list
-            for dst_ip6 in str(check_tshark_output_ip6).split('\\n'):
-                tshark_dst_ips.append(dst_ip6)
+        for dst_ip6 in check_tshark_result_ip6.stdout.splitlines():
+            tshark_dst_ips.append(dst_ip6)
         else:
             print('    \033[1;33m;40m [*] Unable to read the file: {}'.format(pcap_file))
             print('   [*] Check the file permission. \033[1;33m;0m')
     
     # print('[*] Clearning up the TShark destination IPs, removing unwanted characters ...')
-    tshark_dst_ips = [ip.strip("b'") for ip in tshark_dst_ips]
-    tshark_dst_ips = [ip.split('\\t') for ip in tshark_dst_ips]
+    tshark_dst_ips = [
+        ip.strip()
+        for ip in tshark_dst_ips
+        if ip.strip()
+    ]
+    # tshark_dst_ips = [ip.strip("b'") for ip in tshark_dst_ips]
+    # tshark_dst_ips = [ip.split('\\t') for ip in tshark_dst_ips]
     
-    #print('[*] Flattening the list of lists ...')
-    tshark_dst_ips = [ips for item in tshark_dst_ips for ips in item]
+    # #print('[*] Flattening the list of lists ...')
+    # tshark_dst_ips = [ips for item in tshark_dst_ips for ips in item]
 
-    # Remove empty strings
-    tshark_dst_ips = ' '.join(tshark_dst_ips).split()
+    # # Remove empty strings
+    # tshark_dst_ips = ' '.join(tshark_dst_ips).split()
 
     #print('[*] TShark Destination IPs with PUSH flag set \n{}'.format(tshark_dst_ips))
     print('[*] Comparing downloaded IPs with those in your PCAPs ...')
@@ -310,7 +359,16 @@ def ip_intel_download():
         print('[*] Writing IP information to: \n   [./ip_threat_intel_2020-04-25T10:[{}|{}|{}]'.format(ip_threat_fp.name, ipv6_threat_session.name, ipv6_threat_session.name))
         
         # Read the pcap again, this time, matching on the particular communications and ports
-        for pcap_file in glob.glob(pcap_dir + '*.*cap*'):
+        pcap_files = [
+            path 
+            for path in pcap_dir.glob('*.*cap*')
+            if path.is_file()
+            and os.access(path, os.R_OK)
+        ]
+
+        for pcap_path in pcap_files:
+            pcap_file = str(pcap_path)
+        # for pcap_file in pcap_path.glob('*.*cap*'):
             print('[*] Reading PCAP File to extract session information: {}'.format(pcap_file))
             for ip in suspicious_ips:
                 ipv4_address = re.findall(ipv4_pattern, ip)
@@ -322,13 +380,58 @@ def ip_intel_download():
                 # Check to see if the IP is an IPv4 address
                 if ipv4_address:
                     #print('[*] Working with IPv4 addresses \n')
-                    sp.call(['tshark', '-n', '-r', pcap_file, '-Y', 'ip.addr == '+ ip + '', '-T', 'fields', '-e', 'frame.number', '-e', 'frame.time', '-e', 'ip.src', '-e', 'tcp.srcport', '-e', 'ip.dst', '-e', 'tcp.dstport', '-e', 'frame.len', '-e', 'ip.len'], stdout=ipv4_threat_session, stderr=sp.PIPE)
+                    result = sp.run([
+                        'tshark', 
+                        '-n', 
+                        '-r', str(pcap_path), 
+                        '-Y', f'ip.addr == {ip}', 
+                        '-T', 'fields', 
+                        '-e', 'frame.number', 
+                        '-e', 'frame.time', 
+                        '-e', 'ip.src', 
+                        '-e', 'tcp.srcport', 
+                        '-e', 'ip.dst', 
+                        '-e', 'tcp.dstport', 
+                        '-e', 'frame.len', 
+                        '-e', 'ip.len'
+                        ], 
+                        stdout=ipv4_threat_session, 
+                        stderr=sp.PIPE,
+                        text=True
+                        )
+
+                    if result.returncode != 0:
+                        print(f'[!] TShark IPv4 error for {pcap_path}:')
+                        print(result.stderr.strip())
 
 
                 # Check to see if the IP is an IPv6 address
                 elif ipv6_address: 
                     #print('[*] Working with IPv6 addresses \n')
-                    sp.call(['tshark', '-n', '-r', pcap_file, '-Y', 'ipv6.addr == '+ ip + '', '-T', 'fields', '-e', 'frame.number', '-e', 'frame.time', '-e', 'ipv6.src', '-e', 'tcp.srcport', '-e', 'ipv6.dst', '-e', 'tcp.dstport', '-e', 'frame.len'], stdout=ipv6_threat_session, stderr=sp.PIPE)
+                    result = sp.run([
+                        'tshark', 
+                        '-n', 
+                        '-r', str(pcap_path), 
+                        '-Y', f'ipv6.addr == {ip}', 
+                        '-T', 'fields', 
+                        '-e', 'frame.number', 
+                        '-e', 'frame.time', 
+                        '-e', 'ipv6.src', 
+                        '-e', 'tcp.srcport', 
+                        '-e', 'ipv6.dst', 
+                        '-e', 'tcp.dstport', 
+                        '-e', 'frame.len'
+                        ], 
+                        stdout=ipv6_threat_session, 
+                        stderr=sp.PIPE,
+                        text=True
+                        )
+
+                    if result.returncode != 0:
+                        print(f'[!] TShark IPv6 error for {pcap_path}:')
+                        print(result.stderr.strip())
+
+                
 
                 # Check here for any other strings
                 else:
@@ -336,13 +439,13 @@ def ip_intel_download():
                     pass
 
     # close the file which contains the IP and session information
-    print('\n[*] Closing the file {}'.format(ip_threat_fp.name))
+    print(f'\n[*] Closing the file {ip_threat_fp.name}')
     ip_threat_fp.close()
 
-    print('[*] Closing the file {}'.format(ipv4_threat_session.name))
+    print(f'[*] Closing the file {ipv4_threat_session.name}')
     ipv4_threat_session.close()
     
-    print('[*] Closing the file {}'.format(ipv6_threat_session.name))
+    print(f'[*] Closing the file {ipv6_threat_session.name}')
     ipv6_threat_session.close()
 
     print('[*] Completed IP Threat Intelligence Lookup!')
@@ -352,7 +455,8 @@ def ip_intel_download():
 
 
 # Download Domain Threat Intelligence Information
-def domain_intel_download():
+def domain_intel_download(pcap_dir):
+    pcap_dir = Path(pcap_dir)
     time.sleep(2)
     temp_list= []
     tshark_domains = []
@@ -367,7 +471,7 @@ def domain_intel_download():
     # Regex courtesy of regexr.com/3au3g
     dns_pattern = re.compile(r'(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9][a-z0-9-]{0,61}[a-z0-9]')
     
-    pcap_dir = pkt_ini()['MAIN']['pcap_dir']
+    # pcap_dir = pkt_ini()['MAIN']['pcap_dir']
     
     print('[*] Beginning DNS Threat Intelligence ...')
     
@@ -376,14 +480,12 @@ def domain_intel_download():
         print('    Downloading Domain blocklist from: {}'.format(dns_url))
         
         try:
-            with url_request.urlopen(dns_request) as url_response:
-                blacklisted_dns = list(str(url_response.read()).split('\\n'))
+            with url_request.urlopen(dns_request,timeout=10) as url_response:
+                blacklisted_dns = url_response.read().decode('utf-8', errors='replace').splitlines()
                 malicious_domains.append(blacklisted_dns)
-        except HTTPError as e:
-            pass
- 
-        except (HTTPError, URLError) as e:
-            print('     Looks like an issues was encountered. \n       {}'.format(e.reason))
+        except ( HTTPError, URLError, TimeoutError ):
+            print('     Looks like an issues was encountered. \n')
+            continue
         
         else:
             print('     Successfully downloaded DNS Threat Intelligence')
@@ -408,40 +510,83 @@ def domain_intel_download():
     print('[*] Removing Duplicates from the downloaded domains ... ')
     malicious_domains = set(malicious_domains)
     # print('Here are the malicious domains downloaded: {}'.format(malicious_domains))
-    print('[*] There are \033[1;31;40m {} domains \033[0m reported as malicious'.format(len(malicious_domains)))
+    print(f'[*] There are \033[1;31;40m {len(malicious_domains)} domains \033[0m reported as malicious')
     
        
     # Run TShark against each of the PCAPS found
     print('\n[*] Reading PCAP files ...')
     print('     Reading UDP|TCP destination port 53 query | http.host | tls.handshake.extensions_server_name ...')
     print('[*] Work with me here! This may take a while ...')
-    for pcap_file in glob.glob(pcap_dir + '*.pcap*'):
-        if ( os.access(pcap_file, os.R_OK)):
+    for pcap_path in pcap_dir.glob('*.*cap*'):
+        if not os.access(pcap_path, os.R_OK): 
+            print(f'    [!] Unable to read PCAP: {pcap_path}')
+            print(f'    [!] Check file permission')
+            continue 
             '''
-            Attackers cannot hide all their activities behind encryption
-            Here we are reading the Server Name Information (SNI) Extension from
-            the TLS Client Hello record
-            '''
+        Attackers cannot hide all their activities behind encryption
+        Here we are reading the Server Name Information (SNI) Extension from
+        the TLS Client Hello record
+        '''
+        display_filter = (
+            '((udp.dstport == 53) || (tcp.dstport == 53)) && '
+            '(dns.qry.type == 1) || ((tcp.dstport == 80) '
+            '&& ((http.request.method == "GET") || '
+            '(http.request.method == "POST")))  || '
+            '((tcp.dstport == 443) && '
+            '(tls.handshake.type == 1))'
 
-            check_tshark_output = sp.check_output(['tshark', '-n', '-r', pcap_file, '-Y', "((udp.dstport == 53) || (tcp.dstport == 53) && (dns.qry.type == 1)) || ((tcp.dstport == 80) && (http.request.method == 'GET') || (http.request.method == 'POST'))  || ((tcp.dstport == 443) && (tls.handshake.type == 1))"'', '-T', 'fields', '-e', 'dns.qry.name', '-e', 'http.host', '-e', 'tls.handshake.extensions_server_name'], stderr=sp.PIPE)
-            
-            tshark_domains.append(check_tshark_output)
+        )
+        result = sp.run([
+            'tshark', 
+            '-n', 
+            '-r', str(pcap_path), 
+            '-Y', display_filter, 
+            '-T', 'fields', 
+            '-e', 'dns.qry.name', 
+            '-e', 'http.host', 
+            '-e', 'tls.handshake.extensions_server_name'], 
+            capture_output=True,
+            text=True
+            )
 
-        else:
-            print(' \033[1;33m;40m [!] Unable to read the file: {}'.format(pcap_file))
-            print('    [!] Please check the file permission. \033[0m')
+        if result.returncode != 0:
+            print(f'    [!] Unable to read PCAP: {pcap_path}')
+            print(f'    [!] TShark error: {result.stderr.strip()}')
+            continue
+
+        for line in result.stdout.splitlines():
+            for domain in line.split('\t'):
+                domain = domain.strip()
+                if domain:
+                    tshark_domains.append(domain)
+
+        # else:
+        #     print(f' \033[1;33m;40m [!] Unable to read the file: {pcap_path}')
+        #     print('    [!] Please check the file permission. \033[0m')
     
     '''
     Tidying up the mess which was returned from reading the PCAP
     such as \\t\\t\\n, etc
     '''
-    tshark_domains = [str(qry).replace('\\t\\t', '') for qry in tshark_domains]
-    tshark_domains = [qry.split("\\n") for qry in tshark_domains if qry]
-    tshark_domains = [name for query in tshark_domains for name in query]
+    # tshark_domains = [str(qry).replace('\\t\\t', '') for qry in tshark_domains]
+    # tshark_domains = [qry.split("\\n") for qry in tshark_domains if qry]
+    # tshark_domains = [name for query in tshark_domains for name in query]
     #print('[*] Here are the tshark domains {}'.format(tshark_domains))
 
+    # 
+    malicious_domains = {
+        domain.strip().lower()
+        for domain in malicious_domains
+        if domain.strip()
+    }
+
+    tshark_domains = {
+        domain.strip().lower()
+        for domain in tshark_domains
+        if domain.strip()
+    }
     print('[*] Removing Duplicate entries from the list ... \n')
-    
+
     # Check to see if malicious domains which were downloaded are part of the PCAPS
     suspicious_domains = set(malicious_domains) & set(tshark_domains)
     
@@ -458,10 +603,41 @@ def domain_intel_download():
         for domain in suspicious_domains:
             # print('[*] Suspicious Domain: {}'.format(domain))
             # Read the pcap again, this time, matching on the particular DNS communication
-            for pcap_file in glob.glob(pcap_dir + '*.pcap*'):
+            for pcap_file in pcap_dir.glob('*.pcap*'):
                 # Read the PCAPs again, looking for the information to fill out the session
-                print('[*] Reading PCAP: {}'.format(pcap_file))
-                sp.call(['tshark', '-r', pcap_file, '-Y', '((udp.dstport == 53) || (tcp.dstport == 53) && (dns.qry.name =="' + domain + '")) || http.host == "' + domain + '" || tls.handshake.extensions_server_name == "' + domain + '"', '-T', 'fields', '-e', 'ip.src', '-e', 'ipv6.src', '-e', 'udp.srcport', '-e', 'tcp.srcport',  '-e', 'ip.dst', '-e', 'ipv6.dst', '-e', 'udp.dstport', '-e', 'tcp.dstport', '-e', 'dns.qry.name', '-e', 'http.host', '-e', 'tls.handshake.extensions_server_name'], stdout=dns_threat_fp, stderr=sp.PIPE)
+                print('[*] Reading PCAP: {pcap_file}')
+
+                display_filter = ('((udp.dstport == 53) || ' \
+                '(tcp.dstport == 53) && '
+                f'(dns.qry.name == "{domain}")) ||'
+                f' http.host == "{domain}" || '
+                f'tls.handshake.extensions_server_name == "{domain}"' 
+                )
+
+                result = sp.run([
+                    'tshark', 
+                    '-r', str(pcap_file), 
+                    '-Y',  display_filter,
+                    '-T', 'fields',
+                    '-e', 'ip.src', 
+                    '-e', 'ipv6.src', 
+                    '-e', 'udp.srcport', 
+                    '-e', 'tcp.srcport',  
+                    '-e', 'ip.dst', 
+                    '-e', 'ipv6.dst', 
+                    '-e', 'udp.dstport', 
+                    '-e', 'tcp.dstport', 
+                    '-e', 'dns.qry.name', 
+                    '-e', 'http.host', 
+                    '-e', 'tls.handshake.extensions_server_name'], 
+                    stdout=dns_threat_fp, 
+                    stderr=sp.PIPE
+                    )
+
+                if result.returncode != 0:
+                    print(f'    [!] TShark error reading {pcap_file}:')
+                    print(f'    [!] {result.stderr.strip()}')   
+
     
     # close the file which contains the domain and session information
     print('[*] Closing the file {}'.format(dns_threat_fp.name))
@@ -475,7 +651,8 @@ def domain_intel_download():
 
 
 # Download URL Threat Intelligence Information
-def url_intel_download():
+def url_intel_download(pcap_dir):
+    pcap_dir = Path(pcap_dir)
     time.sleep(2)
     temp_list= []
     tshark_urls = []
@@ -490,7 +667,7 @@ def url_intel_download():
     # Regex courtesy of https://regexr.com/3dm7s
     url_pattern = re.compile(r'http[s]?:\/\/(?:[a-z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-f][0-9a-f]))+')
     
-    pcap_dir = pkt_ini()['MAIN']['pcap_dir']
+    #pcap_dir = pkt_ini()['MAIN']['pcap_dir']
     
     print('[*] Beginning URL Threat Intelligence ...')
 
@@ -499,14 +676,12 @@ def url_intel_download():
         print('    Downloading URL blocklist from: {}'.format(url))
         
         try:
-            with url_request.urlopen(url) as url_response:
-                blacklisted_urls = list(str(url_response.read()).split('\\n'))
-                malicious_urls.append(blacklisted_urls)
-        except HTTPError as e:
-            pass
- 
-        except (HTTPError, URLError) as e:
-            print('     Looks like an issues was encountered. \n       {}'.format(e.reason))
+            with url_request.urlopen(url, timeout=10) as url_response:
+                blacklisted_urls = url_response.read().decode('utf-8', errors='replace').splitlines()
+                malicious_urls.append(blacklisted_urls) 
+        except (HTTPError, URLError, TimeoutError) :
+            print('     Looks like an issues was encountered. \n')
+            continue
         
         else:
             print('     Successfully downloaded DNS Threat Intelligence')
@@ -539,37 +714,69 @@ def url_intel_download():
     print('\n[*] Reading PCAP files ...')
     print('[*] Looking for URLs ...')
     print('[*] Work with me here! This may take a while ...')
-    for pcap_file in glob.glob(pcap_dir + '*.pcap*'):
+    for pcap_file in pcap_dir.glob('*.pcap*'):
         print('[*] Reading file: {}'.format(pcap_file))
-        if ( os.access(pcap_file, os.R_OK)):
-            check_tshark_output = sp.check_output(['tshark', '-n', '-r', pcap_file, '-Y', "(http)"'', '-T', 'fields', '-e', 'http.request.full_uri'], stderr=sp.PIPE)
-            # print('[*] Here is the result from check_output \n{}'.format(check_tshark_output))
-            tshark_urls.append(check_tshark_output)
-        else:
-            print('     \033[1;33;40m [!] Unable to read the file: {} \033[0m' .format(pcap_file))
-            print('     \033[1;33;40m [!] Please check the file permission. \033[0m ')
+        if not os.access(pcap_file, os.R_OK):
+            print(f'    [!] Unable to read PCAP: {pcap_file}')
+            print(f'    [!] Check file permission')
+            continue 
+
+        result = sp.run([
+            'tshark', 
+            '-n', 
+            '-r', str(pcap_file), 
+            '-Y', "(http)"'', 
+            '-T', 'fields', 
+            '-e', 'http.request.full_uri'], 
+            capture_output=True,
+            text=True
+            )
+
+        if result.returncode != 0:
+            print(f'    [!] Unable to read PCAP: {pcap_file}')
+            print(f'    [!] TShark error: {result.stderr.strip()}')
+            continue 
+
+        for url in result.stdout.splitlines():
+            url = url.strip()
+            if url:
+                tshark_urls.append(url)
+
+        
+        # print('[*] Here is the result from check_output \n{}'.format(check_tshark_output))
+        # tshark_urls.append(check_tshark_output)
 
 
-
-    tshark_urls = tshark_urls
-    # print('[*] Here are the TShark URIs found \n{}'.format(tshark_urls))
+    # tshark_urls = tshark_urls
+    # # print('[*] Here are the TShark URIs found \n{}'.format(tshark_urls))
  
-    # Remove empty items from the tshark_url list
-    tshark_urls = [url for url in tshark_urls if url]
-    # print('[*] Results from TShark urls \n{}'.format(tshark_urls))
+    # # Remove empty items from the tshark_url list
+    # tshark_urls = [url for url in tshark_urls if url]
+    # # print('[*] Results from TShark urls \n{}'.format(tshark_urls))
     
-    # Thanks to Vinamra Bhatnagar for help on this for loop to help with the flatten of this list of lists
-    for url in tshark_urls:
-        # Decode as UTF-8 and remove the '\n' character
-        tmp = url.decode('utf-8').split('\n')
-        # remote empty items 
-        tmp = [url for url in tmp if url]
-        temp_list.extend(tmp)
+    # # Thanks to Vinamra Bhatnagar for help on this for loop to help with the flatten of this list of lists
+    # for url in tshark_urls:
+    #     # Decode as UTF-8 and remove the '\n' character
+    #     tmp = url.decode('utf-8').split('\n')
+    #     # remote empty items 
+    #     tmp = [url for url in tmp if url]
+    #     temp_list.extend(tmp)
 
-    url_domains = temp_list
+    # url_domains = temp_list
     print('[*] Removing Duplicate entries from the list ...')
+    malicious_urls = {
+        url.strip()
+        for url in malicious_urls
+        if url.strip()
+    }
+
+    tshark_urls = {
+        url.strip()
+        for url in tshark_urls
+        if url.strip()
+    }
     # print('[*] Length of TShark URLs before duplication is: {}'.format(len(tshark_domains)))
-    tshark_urls = set(temp_list)
+    # tshark_urls = set(temp_list)
     #print('[*] Here is the results from tshark_urls \n{}'.format(tshark_urls))
     
     # Check to see if malicious domains which were downloaded are part of the PCAPS
@@ -589,9 +796,30 @@ def url_intel_download():
             # print('URL for you: {}'.format(url))
 
             # Read the pcap again, this time, matching on the particular DNS communication     
-            for pcap_file in glob.glob(pcap_dir + '*.pcap*'):
+            for pcap_file in pcap_dir.glob('*.pcap*'):
 #               print('[*] Reading PCAP File to extract session information: {}'.format(pcap_file))12.61.
-                sp.call(['tshark', '-n', '-r', pcap_file, '-Y', '(http.request.full_uri == "'+ url + '")', '-T', 'fields', '-e', 'frame.number', '-e', 'frame.time', '-e', 'ip.src', '-e', 'tcp.srcport', '-e', 'ip.dst', '-e', 'tcp.dstport', '-e', 'http.request.full_uri', '-e', 'ip.len', '-e', 'tcp.len'], stdout=url_threat_fp, stderr=sp.PIPE)
+                display_filter = f'(http.request.full_uri == "{url}")'
+                result = sp.run([
+                    'tshark', 
+                    '-n', 
+                    '-r', str(pcap_file), 
+                    '-Y', display_filter,
+                    '-T', 'fields', 
+                    '-e', 'frame.number', 
+                    '-e', 'frame.time', 
+                    '-e', 'ip.src', 
+                    '-e', 'tcp.srcport', 
+                    '-e', 'ip.dst', 
+                    '-e', 'tcp.dstport', 
+                    '-e', 'http.request.full_uri', 
+                    '-e', 'ip.len', 
+                    '-e', 'tcp.len'], 
+                    stdout=url_threat_fp, 
+                    stderr=sp.PIPE
+                    )
+                if result.returncode != 0:
+                    print(f'[!] TShark IPv4 error for {pcap_file}:')
+                    print(result.stderr.strip())
 
     
     # close the file which contains the domain and session information
@@ -625,19 +853,22 @@ def main():
     config_checks()
     verify_pcap_path()
     system_clean_up()
+
+    # Setup the pcap dir
+    pcap_dir = Path(pkt_ini()['MAIN']['pcap_dir'])
     
     
     # Check if the argument entered is IP
     if (argument_parser.ip):
-        ip_intel_download()
+        ip_intel_download(pcap_dir=pcap_dir)
 
     # Check if the argument entered is domain
     elif (argument_parser.dns):
-        domain_intel_download()
+        domain_intel_download(pcap_dir=pcap_dir)
 
     # Check if the argument entered is URL
     elif (argument_parser.url):
-        url_intel_download()
+        url_intel_download(pcap_dir=pcap_dir)
 
     else:
         print('[!] Error! Unknown Option. Usage \033[1;37;40m ./pktIntel.py [ --ip | --dns | --url] \033[0m')
@@ -656,13 +887,17 @@ if __name__ == '__main__':
 
     # Check permission. 
     print('[*] Checking your permission ...')
+
+    uid =  os.getuid()
+    username = pwd.getpwuid(uid).pw_name
+    
     time.sleep(2)
-    if ( os.getuid() != 0):
+    if ( uid != 0):
         print(' \033[1;37;40m   I don\'t need root permissions to read PCAPS ')
         print('    However, if you have PCAPs created by root or other users')
         print('    You should instead run me with root permission via sudo')
 
-    print(f'[*] Running as {os.environ['USER']} with UID {os.getuid()} \033[0m \n')
+    print(f'[*] Running as {username} with UID {uid} \033[0m \n')
 
     check_tshark_installed()
 

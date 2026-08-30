@@ -10,17 +10,19 @@ File: checkTshark.py
 
 __author__ = 'Nik Alleyne'
 __contact__ = 'nikalleyne at gmail dot com'
-__version__ = '1.0'
+__version__ = '1.1'
 __status__ = 'Development'
 __date__ = '2020-04-20'
 
 
 import configparser as cfgP
 import os
+import pwd
 import subprocess as sp
 import sys
 import time
 from signal import (signal, SIGINT)
+from pathlib import Path
 
 # Configuration file path
 config_file = './pktIntel.conf'
@@ -58,9 +60,10 @@ def verify_capture_tool_installed():
         capture_tool_info['tcpdump'][1] = str(check_tcpdump.stdout).replace("b'", '').replace("\\n'", '')
 
     check_dumpcap = sp.run(['which', 'dumpcap'], stdout=sp.PIPE)
-    if ( check_tcpdump.returncode == 0):
+    if ( check_dumpcap.returncode == 0):
         capture_tool_info['dumpcap'][0] = True
-        capture_tool_info['dumpcap'][1] = str(check_dumpcap.stdout).replace("b'", '').replace("\\n'", '')
+        capture_tool_info['dumpcap'][1] = check_dumpcap.stdout.decode().strip()
+        #str(check_dumpcap.stdout).replace("b'", '').replace("\\n'", '')
 
     print("-" * 50)
     print("Found the following capturing tools")
@@ -75,31 +78,62 @@ def verify_capture_tool_installed():
     tool_choice = int(input("\n[*] Please select a number: "))    
 
 
-def tshark():
+def tshark(output_file) -> None:
     print('\033[1;31;40m [*] Press CTRL+C to exit \033[1;31;0m')
     print(f'[*] Capturing with tshark ...')
-    while True:
-        sp.call(['tshark', '-n', '--interface', 'any', '-w', pcap_dir + 'securitynik.pcap', '--ring-buffer', '--files:100', '--ring-buffer', 'filesize:100000', '--color', '--print'])
 
-def tcpdump():
+    while True:
+        sp.call([
+            'tshark', 
+            '-n', 
+            '--interface', 
+            'any', 
+            '-w', str(output_file), 
+            '--ring-buffer', 'files:100', 
+            '--ring-buffer', 'filesize:100000', 
+            '--color', 
+            '--print'
+            ])
+
+def tcpdump(output_file) -> None:
     print('\033[1;31;40m [*] Press CTRL+C to exit \033[1;31;0m')
     print(f'[*] Capturing with tcpdump ... ...')
     while True:
-        sp.call(['tcpdump', '-n', '--interface', 'any', '-w', pcap_dir + 'securitynik.pcap', '-vv', '--number', '-C', '100', '-W', '100'])
+        sp.call([
+            'tcpdump', 
+            '-n', 
+            '--interface', 'any', 
+            '-w', str(output_file), 
+            '-vv', 
+            '--number', 
+            '-C', '100', 
+            '-W', 
+            '100'
+            ])
 
-def dumpcap():
+def dumpcap(output_file) -> None:
     print('\033[1;31;40m [*] Press CTRL+C to exit \033[1;31;0m')
     print(f'[*] Capturing with dumpcap ...')
     while True:
-        sp.call(['dumpcap', '--interface', 'any', '-w', pcap_dir + 'securitynik.pcap', '--ring-buffer', '--files:100', '--ring-buffer', 'filesize:100000','filename'])
+        sp.call([
+            'dumpcap', 
+            '--interface', 'any', 
+            '-w', str(output_file), 
+            '--ring-buffer', 'files:100', 
+            '--ring-buffer', 'filesize:100000'
+            ])
 
 
 # start TShark
 def start_capturing():   
-    global pcap_dir
     signal(SIGINT, handler)
     print('[*] Verifying PCAP directory exists in MAIN section ...')
-    pcap_dir = pkt_ini()['MAIN']['pcap_dir']
+
+    pcap_dir = Path(pkt_ini()['MAIN']['pcap_dir'])
+     # If the folder does not exist create it
+    pcap_dir.mkdir(parents=True, exist_ok=True)
+    output_file = pcap_dir / 'securitynik.pcap'
+
     print('    PCAP directory reported as "{}"'.format(pcap_dir))
 
     '''
@@ -108,12 +142,25 @@ def start_capturing():
     '''
     print('[*] PCAPs are being written to {} folder!'.format(pcap_dir))
     
-    if ( ( tool_choice == 1 ) and ( capture_tool_info['tshark'][0] == True ) and ( capture_tool_info['tshark'][1] != "" ) ):
-        tshark()
-    elif ( ( tool_choice == 2 ) and ( capture_tool_info['tcpdump'][0] == True ) and ( capture_tool_info['tcpdump'][1] != "" ) ):
-        tcpdump()
-    elif ( ( tool_choice == 3 ) and ( capture_tool_info['dumpcap'][0] == True ) and ( capture_tool_info['dumpcap'][1] != "" ) ):
-        dumpcap()
+    if ( 
+        tool_choice == 1 
+        and capture_tool_info['tshark'][0] 
+        and capture_tool_info['tshark'][1] != ""
+        ):
+        tshark(output_file=output_file)
+
+    elif ( 
+        tool_choice == 2 
+        and capture_tool_info['tcpdump'][0]
+        and capture_tool_info['tcpdump'][1] != ""
+        ):
+        tcpdump(output_file=output_file)
+
+    elif ( tool_choice == 3  
+          and capture_tool_info['dumpcap'][0] 
+          and capture_tool_info['dumpcap'][1] != "" 
+          ):
+        dumpcap(output_file=output_file)
     
     else:
         print(f"\n[ERROR !] Sorry { tool_choice } is an invalid choice ")
@@ -131,13 +178,19 @@ def main():
     
    # Check permission. I need to be run as root or with UID=0
     print('[*] Checking your permission ...')
+
+    uid =  os.getuid()
+    username = pwd.getpwuid(uid).pw_name
+
     time.sleep(2)
-    if ( os.getuid() != 0):
+    if ( uid != 0):
         print('[*] Sorry you need to run me as root!')
         print('[*] Exiting ...')
         sys.exit(-1)
 
-    print('[*] Running as {} with UID {} \n'.format(os.getlogin(), os.getuid()))
+    
+
+    print(f'[*] Running as {username} with UID {os.getuid()} \n')
 
     # Check for main section
     if (pkt_ini().has_section('MAIN')):
