@@ -8,6 +8,7 @@ Author Books:
 
 	- Hack and Detect - Leveraging the Cyber Kill Chain for Practical 
 	- Mastering TShark Network Forensics - Moving From Zero to Hero
+	- A Little Book on Adversarial AI
 
 
 
